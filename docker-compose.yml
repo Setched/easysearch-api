@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: easysearch-postgres
+    environment:
+      POSTGRES_DB: easysearch
+      POSTGRES_USER: easysearch
+      POSTGRES_PASSWORD: easysearch
+    ports:
+      - "5432:5432"
+    volumes:
+      - easysearch_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  easysearch_postgres_data:
