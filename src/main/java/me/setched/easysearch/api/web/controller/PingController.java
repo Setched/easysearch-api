@@ -1,6 +1,6 @@
-package me.setched.easysearch.api.api.controller;
+package me.setched.easysearch.api.web.controller;
 
-import me.setched.easysearch.api.api.dto.PingResponse;
+import me.setched.easysearch.api.web.dto.PingResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
