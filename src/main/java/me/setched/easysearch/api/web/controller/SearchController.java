@@ -23,6 +23,6 @@ public class SearchController {
     public SearchResponse search(@Valid @RequestBody SearchRequest request) {
         SearchQuery query = new SearchQuery(request.query());
         ComparisonResult result = compareOffersUseCase.compare(query);
-        return SearchResponse.from(result);
+        return SearchResponse.from(result, request.page(), request.size(), request.sort());
     }
 }

@@ -44,7 +44,44 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.query").value("iphone 15"))
                 .andExpect(jsonPath("$.totalOffers").value(2))
                 .andExpect(jsonPath("$.bestOffer.marketplace").value("WILDBERRIES"))
-                .andExpect(jsonPath("$.offers.length()").value(2));
+                .andExpect(jsonPath("$.offers.length()").value(2))
+                .andExpect(jsonPath("$.offers[0].marketplace").value("WILDBERRIES"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    @Test
+    void sortsOffersByPriceDescendingWhenRequested() throws Exception {
+        ComparisonResult result = new ComparisonResult(new SearchQuery("iphone 15"), List.of(
+                new MarketplaceOffer(Marketplace.WILDBERRIES, "iPhone 15", new BigDecimal("72990"), "https://wildberries.ru"),
+                new MarketplaceOffer(Marketplace.OZON, "iPhone 15", new BigDecimal("74990"), "https://ozon.ru")));
+        when(compareOffersUseCase.compare(any())).thenReturn(result);
+
+        mockMvc.perform(post("/api/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"iphone 15\",\"sort\":\"PRICE_DESC\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.offers[0].marketplace").value("OZON"))
+                .andExpect(jsonPath("$.offers[1].marketplace").value("WILDBERRIES"));
+    }
+
+    @Test
+    void paginatesOffersAccordingToPageAndSize() throws Exception {
+        ComparisonResult result = new ComparisonResult(new SearchQuery("iphone 15"), List.of(
+                new MarketplaceOffer(Marketplace.WILDBERRIES, "iPhone 15", new BigDecimal("72990"), "https://wildberries.ru"),
+                new MarketplaceOffer(Marketplace.OZON, "iPhone 15", new BigDecimal("74990"), "https://ozon.ru"),
+                new MarketplaceOffer(Marketplace.YANDEX_MARKET, "iPhone 15", new BigDecimal("76990"), "https://market.yandex.ru")));
+        when(compareOffersUseCase.compare(any())).thenReturn(result);
+
+        mockMvc.perform(post("/api/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"iphone 15\",\"page\":1,\"size\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalOffers").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.offers.length()").value(1))
+                .andExpect(jsonPath("$.offers[0].marketplace").value("YANDEX_MARKET"));
     }
 
     @Test
