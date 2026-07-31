@@ -5,6 +5,7 @@ import me.setched.easysearch.api.domain.model.ComparisonResult;
 import me.setched.easysearch.api.domain.model.MarketplaceOffer;
 import me.setched.easysearch.api.domain.model.SearchQuery;
 import me.setched.easysearch.api.domain.port.MarketplaceClient;
+import me.setched.easysearch.api.domain.port.SearchHistoryRecorder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,9 +15,11 @@ import java.util.Objects;
 public class CompareOffersService implements CompareOffersUseCase {
 
     private final List<MarketplaceClient> marketplaceClients;
+    private final SearchHistoryRecorder searchHistoryRecorder;
 
-    public CompareOffersService(List<MarketplaceClient> marketplaceClients) {
+    public CompareOffersService(List<MarketplaceClient> marketplaceClients, SearchHistoryRecorder searchHistoryRecorder) {
         this.marketplaceClients = marketplaceClients;
+        this.searchHistoryRecorder = searchHistoryRecorder;
     }
 
     @Override
@@ -30,6 +33,8 @@ public class CompareOffersService implements CompareOffersUseCase {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return new ComparisonResult(query, offers);
+        ComparisonResult result = new ComparisonResult(query, offers);
+        searchHistoryRecorder.record(result);
+        return result;
     }
 }
