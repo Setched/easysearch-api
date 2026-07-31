@@ -89,6 +89,31 @@ class SearchControllerTest {
         mockMvc.perform(post("/api/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details[0]").value("query: must not be blank"));
+    }
+
+    @Test
+    void returnsBadRequestWhenUseCaseRejectsQuery() throws Exception {
+        when(compareOffersUseCase.compare(any())).thenThrow(new IllegalArgumentException("Search query must not be blank"));
+
+        mockMvc.perform(post("/api/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"whatever\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Search query must not be blank"));
+    }
+
+    @Test
+    void returnsInternalServerErrorOnUnexpectedFailure() throws Exception {
+        when(compareOffersUseCase.compare(any())).thenThrow(new RuntimeException("boom"));
+
+        mockMvc.perform(post("/api/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"iphone 15\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message").value("Something went wrong"));
     }
 }

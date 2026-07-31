@@ -61,4 +61,20 @@ class CompareOffersServiceTest {
         assertThatThrownBy(() -> service.compare(new SearchQuery("  ")))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void skipsFailingMarketplaceClientAndKeepsOthers() {
+        MarketplaceClient failing = query -> {
+            throw new RuntimeException("marketplace unavailable");
+        };
+        MarketplaceClient ozon = query -> List.of(
+                new MarketplaceOffer(Marketplace.OZON, "iPhone 15", new BigDecimal("74990"), "https://ozon.ru"));
+
+        CompareOffersService service = new CompareOffersService(List.of(failing, ozon), searchHistoryRecorder);
+
+        ComparisonResult result = service.compare(new SearchQuery("iphone 15"));
+
+        assertThat(result.totalOffers()).isEqualTo(1);
+        assertThat(result.offers().get(0).marketplace()).isEqualTo(Marketplace.OZON);
+    }
 }

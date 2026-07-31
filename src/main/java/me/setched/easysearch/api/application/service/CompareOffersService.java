@@ -6,6 +6,8 @@ import me.setched.easysearch.api.domain.model.MarketplaceOffer;
 import me.setched.easysearch.api.domain.model.SearchQuery;
 import me.setched.easysearch.api.domain.port.MarketplaceClient;
 import me.setched.easysearch.api.domain.port.SearchHistoryRecorder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,6 +15,8 @@ import java.util.Objects;
 
 @Service
 public class CompareOffersService implements CompareOffersUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(CompareOffersService.class);
 
     private final List<MarketplaceClient> marketplaceClients;
     private final SearchHistoryRecorder searchHistoryRecorder;
@@ -29,12 +33,21 @@ public class CompareOffersService implements CompareOffersUseCase {
         }
 
         List<MarketplaceOffer> offers = marketplaceClients.stream()
-                .flatMap(client -> client.search(query).stream())
+                .flatMap(client -> searchSafely(client, query).stream())
                 .filter(Objects::nonNull)
                 .toList();
 
         ComparisonResult result = new ComparisonResult(query, offers);
         searchHistoryRecorder.record(result);
         return result;
+    }
+
+    private List<MarketplaceOffer> searchSafely(MarketplaceClient client, SearchQuery query) {
+        try {
+            return client.search(query);
+        } catch (Exception e) {
+            log.warn("Marketplace client {} failed for query '{}': {}", client.getClass().getSimpleName(), query.query(), e.getMessage());
+            return List.of();
+        }
     }
 }
