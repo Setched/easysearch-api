@@ -21,3 +21,12 @@ spring:
 
 server:
   port: 8080
+
+easysearch:
+  marketplaces:
+    ozon:
+      base-url: https://api-seller.ozon.ru
+      api-key: ${OZON_API_KEY:}
+      client-id: ${OZON_CLIENT_ID:}
+      connect-timeout: 2s
+      read-timeout: 5s
