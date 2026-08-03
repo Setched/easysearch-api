@@ -8,12 +8,10 @@ import me.setched.easysearch.api.domain.port.MarketplaceClient;
 import me.setched.easysearch.api.domain.port.SearchHistoryRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 
-@Service
 public class CompareOffersService implements CompareOffersUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CompareOffersService.class);
