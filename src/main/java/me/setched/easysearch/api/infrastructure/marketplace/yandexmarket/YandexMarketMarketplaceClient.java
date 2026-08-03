@@ -4,12 +4,10 @@ import me.setched.easysearch.api.domain.model.Marketplace;
 import me.setched.easysearch.api.domain.model.MarketplaceOffer;
 import me.setched.easysearch.api.domain.model.SearchQuery;
 import me.setched.easysearch.api.domain.port.MarketplaceClient;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-@Component
 public class YandexMarketMarketplaceClient implements MarketplaceClient {
 
     private static final String SUPPORTED_QUERY = "iphone 15";

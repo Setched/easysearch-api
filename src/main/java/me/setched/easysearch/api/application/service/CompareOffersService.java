@@ -46,7 +46,7 @@ public class CompareOffersService implements CompareOffersUseCase {
         try {
             return client.search(query);
         } catch (Exception e) {
-            log.warn("Marketplace client {} failed for query '{}': {}", client.getClass().getSimpleName(), query.query(), e.getMessage());
+            log.warn("Marketplace client {} failed for query '{}': {}", client, query.query(), e.getMessage());
             return List.of();
         }
     }

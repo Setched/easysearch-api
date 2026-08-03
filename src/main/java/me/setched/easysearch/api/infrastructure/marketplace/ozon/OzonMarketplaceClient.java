@@ -4,12 +4,10 @@ import me.setched.easysearch.api.domain.model.Marketplace;
 import me.setched.easysearch.api.domain.model.MarketplaceOffer;
 import me.setched.easysearch.api.domain.model.SearchQuery;
 import me.setched.easysearch.api.domain.port.MarketplaceClient;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
-@Component
 public class OzonMarketplaceClient implements MarketplaceClient {
 
     private static final String SEARCH_PATH = "/v1/search";
