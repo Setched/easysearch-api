@@ -17,7 +17,7 @@ public class CompareOffersUseCaseConfig {
     @Bean
     public CompareOffersUseCase compareOffersUseCase(List<MarketplaceClient> marketplaceClients, SearchHistoryRecorder searchHistoryRecorder,
                                                        MarketplaceClientsProperties properties, ExecutorService marketplaceClientExecutor) {
-        CompareOffersService compareOffersService = new CompareOffersService(marketplaceClients, searchHistoryRecorder);
+        CompareOffersService compareOffersService = new CompareOffersService(marketplaceClients, searchHistoryRecorder, marketplaceClientExecutor);
         return new TimeoutEnforcingCompareOffersUseCase(compareOffersService, properties.compareTimeout(), marketplaceClientExecutor);
     }
 }

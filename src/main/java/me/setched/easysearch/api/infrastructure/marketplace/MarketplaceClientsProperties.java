@@ -12,7 +12,7 @@ public record MarketplaceClientsProperties(Duration searchTimeout, Duration comp
             searchTimeout = Duration.ofSeconds(3);
         }
         if (compareTimeout == null) {
-            compareTimeout = Duration.ofSeconds(10);
+            compareTimeout = Duration.ofSeconds(5);
         }
     }
 }
