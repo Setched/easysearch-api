@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 public class CompareOffersService implements CompareOffersUseCase {
 
@@ -18,10 +20,12 @@ public class CompareOffersService implements CompareOffersUseCase {
 
     private final List<MarketplaceClient> marketplaceClients;
     private final SearchHistoryRecorder searchHistoryRecorder;
+    private final ExecutorService executor;
 
-    public CompareOffersService(List<MarketplaceClient> marketplaceClients, SearchHistoryRecorder searchHistoryRecorder) {
+    public CompareOffersService(List<MarketplaceClient> marketplaceClients, SearchHistoryRecorder searchHistoryRecorder, ExecutorService executor) {
         this.marketplaceClients = marketplaceClients;
         this.searchHistoryRecorder = searchHistoryRecorder;
+        this.executor = executor;
     }
 
     @Override
@@ -30,8 +34,12 @@ public class CompareOffersService implements CompareOffersUseCase {
             throw new IllegalArgumentException("Search query must not be blank");
         }
 
-        List<MarketplaceOffer> offers = marketplaceClients.stream()
-                .flatMap(client -> searchSafely(client, query).stream())
+        List<CompletableFuture<List<MarketplaceOffer>>> searches = marketplaceClients.stream()
+                .map(client -> CompletableFuture.supplyAsync(() -> searchSafely(client, query), executor))
+                .toList();
+
+        List<MarketplaceOffer> offers = searches.stream()
+                .flatMap(search -> search.join().stream())
                 .filter(Objects::nonNull)
                 .toList();
 

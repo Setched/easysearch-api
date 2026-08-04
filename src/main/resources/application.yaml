@@ -25,7 +25,7 @@ server:
 easysearch:
   marketplaces:
     search-timeout: 3s
-    compare-timeout: 10s
+    compare-timeout: 5s
     ozon:
       base-url: https://api-seller.ozon.ru
       api-key: ${OZON_API_KEY:}
