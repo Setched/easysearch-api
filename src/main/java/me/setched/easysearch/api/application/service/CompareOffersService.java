@@ -8,12 +8,10 @@ import me.setched.easysearch.api.domain.port.MarketplaceClient;
 import me.setched.easysearch.api.domain.port.SearchHistoryRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 
-@Service
 public class CompareOffersService implements CompareOffersUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CompareOffersService.class);
@@ -46,7 +44,7 @@ public class CompareOffersService implements CompareOffersUseCase {
         try {
             return client.search(query);
         } catch (Exception e) {
-            log.warn("Marketplace client {} failed for query '{}': {}", client.getClass().getSimpleName(), query.query(), e.getMessage());
+            log.warn("Marketplace client {} failed for query '{}': {}", client, query.query(), e.getMessage());
             return List.of();
         }
     }
