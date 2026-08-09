@@ -15,8 +15,15 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+/**
+ * Verifies {@link OzonMarketplaceClient}'s HTTP request/response handling against a mocked REST server.
+ * Does not exercise the real Ozon API.
+ */
 class OzonMarketplaceClientTest {
 
+    /**
+     * Verifies that a successful Ozon response is correctly mapped into {@link MarketplaceOffer} instances.
+     */
     @Test
     void mapsOzonSearchResponseToMarketplaceOffers() {
         RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("https://api-seller.ozon.ru");
@@ -46,6 +53,9 @@ class OzonMarketplaceClientTest {
         server.verify();
     }
 
+    /**
+     * Verifies that a response with no items yields an empty offer list rather than an error.
+     */
     @Test
     void returnsEmptyListWhenResponseHasNoItems() {
         RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("https://api-seller.ozon.ru");

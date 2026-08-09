@@ -15,6 +15,10 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Verifies {@link TimeoutEnforcingCompareOffersUseCase}'s timeout and failure-propagation behavior against
+ * fake delegates.
+ */
 class TimeoutEnforcingCompareOffersUseCaseTest {
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -24,6 +28,9 @@ class TimeoutEnforcingCompareOffersUseCaseTest {
         executor.shutdownNow();
     }
 
+    /**
+     * Verifies that a delegate finishing within the timeout returns its result unchanged.
+     */
     @Test
     void returnsDelegateResultWhenWithinTimeout() {
         SearchQuery query = new SearchQuery("iphone 15");
@@ -36,6 +43,10 @@ class TimeoutEnforcingCompareOffersUseCaseTest {
         assertThat(useCase.compare(query)).isEqualTo(expected);
     }
 
+    /**
+     * Verifies that a delegate exceeding the timeout causes an {@link IllegalStateException} mentioning
+     * the timeout.
+     */
     @Test
     void throwsWhenDelegateExceedsTimeout() {
         CompareOffersUseCase slow = query -> {
@@ -55,6 +66,10 @@ class TimeoutEnforcingCompareOffersUseCaseTest {
                 .hasMessageContaining("timed out");
     }
 
+    /**
+     * Verifies that a {@link RuntimeException} thrown by the delegate (e.g. query validation) is
+     * propagated as-is, not wrapped.
+     */
     @Test
     void propagatesDelegateRuntimeException() {
         CompareOffersUseCase failing = query -> {

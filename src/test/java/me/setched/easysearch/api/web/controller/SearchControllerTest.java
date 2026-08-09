@@ -21,6 +21,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Verifies {@link SearchController}'s HTTP contract (status codes, JSON shape, sorting/pagination,
+ * error handling) with {@link CompareOffersUseCase} mocked out.
+ */
 @WebMvcTest(SearchController.class)
 class SearchControllerTest {
 
@@ -30,6 +34,9 @@ class SearchControllerTest {
     @MockitoBean
     private CompareOffersUseCase compareOffersUseCase;
 
+    /**
+     * Verifies that a valid query returns a 200 response with the expected search response shape.
+     */
     @Test
     void returnsSearchResultsForValidQuery() throws Exception {
         ComparisonResult result = new ComparisonResult(new SearchQuery("iphone 15"), List.of(
@@ -51,6 +58,9 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.totalPages").value(1));
     }
 
+    /**
+     * Verifies that requesting {@code PRICE_DESC} sort returns offers from most to least expensive.
+     */
     @Test
     void sortsOffersByPriceDescendingWhenRequested() throws Exception {
         ComparisonResult result = new ComparisonResult(new SearchQuery("iphone 15"), List.of(
@@ -66,6 +76,9 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.offers[1].marketplace").value("WILDBERRIES"));
     }
 
+    /**
+     * Verifies that page/size parameters correctly slice the offer list and compute total pages.
+     */
     @Test
     void paginatesOffersAccordingToPageAndSize() throws Exception {
         ComparisonResult result = new ComparisonResult(new SearchQuery("iphone 15"), List.of(
@@ -84,6 +97,9 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.offers[0].marketplace").value("YANDEX_MARKET"));
     }
 
+    /**
+     * Verifies that a blank query is rejected with a 400 response listing the validation failure.
+     */
     @Test
     void rejectsBlankQueryWithBadRequest() throws Exception {
         mockMvc.perform(post("/api/search")
@@ -94,6 +110,10 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.details[0]").value("query: must not be blank"));
     }
 
+    /**
+     * Verifies that an {@link IllegalArgumentException} from the use case is translated into a 400
+     * response carrying its message.
+     */
     @Test
     void returnsBadRequestWhenUseCaseRejectsQuery() throws Exception {
         when(compareOffersUseCase.compare(any())).thenThrow(new IllegalArgumentException("Search query must not be blank"));
@@ -105,6 +125,10 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.message").value("Search query must not be blank"));
     }
 
+    /**
+     * Verifies that an unexpected exception from the use case is translated into a generic 500 response,
+     * without leaking the exception's details.
+     */
     @Test
     void returnsInternalServerErrorOnUnexpectedFailure() throws Exception {
         when(compareOffersUseCase.compare(any())).thenThrow(new RuntimeException("boom"));

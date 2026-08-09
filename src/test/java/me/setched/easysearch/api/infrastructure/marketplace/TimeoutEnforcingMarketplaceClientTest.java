@@ -17,6 +17,10 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Verifies {@link TimeoutEnforcingMarketplaceClient}'s timeout, failure-propagation, and pass-through
+ * behavior against fake delegates.
+ */
 class TimeoutEnforcingMarketplaceClientTest {
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -26,6 +30,9 @@ class TimeoutEnforcingMarketplaceClientTest {
         executor.shutdownNow();
     }
 
+    /**
+     * Verifies that a delegate finishing within the timeout returns its result unchanged.
+     */
     @Test
     void returnsDelegateResultWhenWithinTimeout() {
         MarketplaceClient fast = query -> List.of(
@@ -39,6 +46,10 @@ class TimeoutEnforcingMarketplaceClientTest {
         assertThat(offers).hasSize(1);
     }
 
+    /**
+     * Verifies that a delegate exceeding the timeout causes an {@link IllegalStateException} naming the
+     * marketplace and mentioning the timeout.
+     */
     @Test
     void throwsWhenDelegateExceedsTimeout() {
         MarketplaceClient slow = query -> {
@@ -59,6 +70,10 @@ class TimeoutEnforcingMarketplaceClientTest {
                 .hasMessageContaining("timed out");
     }
 
+    /**
+     * Verifies that a delegate throwing an exception has that failure propagated, wrapped and named with
+     * the marketplace.
+     */
     @Test
     void propagatesDelegateFailure() {
         MarketplaceClient failing = query -> {
