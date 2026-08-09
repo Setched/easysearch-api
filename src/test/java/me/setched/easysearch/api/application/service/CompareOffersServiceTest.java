@@ -23,6 +23,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Verifies {@link CompareOffersService}'s orchestration: aggregating offers, picking the cheapest,
+ * isolating failing clients, recording history, and querying clients in parallel — using fake
+ * {@link MarketplaceClient} implementations rather than real marketplace calls.
+ */
 class CompareOffersServiceTest {
 
     private final SearchHistoryRecorder searchHistoryRecorder = Mockito.mock(SearchHistoryRecorder.class);
@@ -33,6 +38,10 @@ class CompareOffersServiceTest {
         executor.shutdownNow();
     }
 
+    /**
+     * Verifies that the cheapest offer across all marketplaces is selected as the best offer, and that
+     * the result is recorded.
+     */
     @Test
     void picksCheapestOfferAmongAllMarketplaces() {
         MarketplaceClient ozon = query -> List.of(
@@ -53,6 +62,9 @@ class CompareOffersServiceTest {
         verify(searchHistoryRecorder, times(1)).record(result);
     }
 
+    /**
+     * Verifies that a comparison with no offers from any marketplace yields an empty, but valid, result.
+     */
     @Test
     void returnsEmptyResultWhenNoMarketplaceHasOffers() {
         MarketplaceClient emptyClient = query -> List.of();
@@ -66,6 +78,9 @@ class CompareOffersServiceTest {
         assertThat(result.totalOffers()).isZero();
     }
 
+    /**
+     * Verifies that a blank query is rejected before any marketplace client is queried.
+     */
     @Test
     void rejectsBlankQuery() {
         CompareOffersService service = new CompareOffersService(List.of(), searchHistoryRecorder, executor);
@@ -74,6 +89,10 @@ class CompareOffersServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * Verifies that one marketplace client throwing an exception doesn't prevent offers from the other,
+     * still-working clients being returned.
+     */
     @Test
     void skipsFailingMarketplaceClientAndKeepsOthers() {
         MarketplaceClient failing = query -> {
@@ -90,6 +109,10 @@ class CompareOffersServiceTest {
         assertThat(result.offers().get(0).marketplace()).isEqualTo(Marketplace.OZON);
     }
 
+    /**
+     * Verifies that marketplace clients are queried concurrently rather than one after another: two
+     * clients that each take 300ms complete in well under the 600ms a sequential run would take.
+     */
     @Test
     void queriesMarketplaceClientsInParallel() {
         Duration delay = Duration.ofMillis(300);

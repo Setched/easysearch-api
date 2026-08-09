@@ -23,6 +23,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 
+/**
+ * Verifies {@link SearchHistoryRecorderAdapter} against a real Postgres instance, provided by
+ * {@link TestcontainersConfiguration}.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = Replace.NONE)
 @Import(TestcontainersConfiguration.class)
@@ -33,6 +37,9 @@ class SearchHistoryRecorderAdapterTest {
     @Autowired
     private SearchHistoryJpaRepository repository;
 
+    /**
+     * Verifies that recording a comparison result persists a matching {@link SearchHistoryEntity} row.
+     */
     @Test
     void persistsSearchHistoryForComparisonResult() {
         SearchHistoryMapper mapper = new SearchHistoryMapper(Clock.systemUTC());
