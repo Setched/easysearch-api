@@ -9,6 +9,7 @@ import logging
 import threading
 
 from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 
 from app.ozon import search as search_ozon
 from app.ozon_session import OzonSession
@@ -21,27 +22,35 @@ app = FastAPI(title="ozon-scraper")
 _session = OzonSession()
 _session_lock = threading.Lock()
 
+# FastAPI's default JSONResponse omits "; charset=utf-8" from Content-Type (valid per RFC 8259 —
+# JSON is always UTF-8), but some HTTP clients (e.g. Windows PowerShell 5.1's Invoke-RestMethod)
+# don't assume UTF-8 without it and garble Cyrillic text. Being explicit costs nothing.
+_JSON_CONTENT_TYPE = "application/json; charset=utf-8"
+
 
 @app.get("/search")
-def search(query: str = Query(..., min_length=1)) -> dict:
+def search(query: str = Query(..., min_length=1)) -> JSONResponse:
     with _session_lock:
         try:
             items = search_ozon(_session, query)
         except Exception:
             logger.exception("Ozon search failed for query '%s'", query)
-            return {"items": []}
+            return JSONResponse(content={"items": []}, media_type=_JSON_CONTENT_TYPE)
 
-    return {
-        "items": [
-            {"name": item.name, "price": float(item.price), "url": item.url}
-            for item in items
-        ]
-    }
+    return JSONResponse(
+        content={
+            "items": [
+                {"name": item.name, "price": float(item.price), "url": item.url}
+                for item in items
+            ]
+        },
+        media_type=_JSON_CONTENT_TYPE,
+    )
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+def health() -> JSONResponse:
+    return JSONResponse(content={"status": "ok"}, media_type=_JSON_CONTENT_TYPE)
 
 
 @app.on_event("shutdown")
