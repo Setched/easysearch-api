@@ -181,6 +181,15 @@ build — no separate commands needed.
 - No production deployment configuration yet (dev-only datasource credentials in
   `application.yaml`, no Dockerfile for the main app).
 
+## Acknowledgments
+
+The Ozon antibot-bypass technique in `ozon-scraper/` (one persistent browser session, pass the
+challenge once, then call Ozon's internal API via `fetch()` from inside the trusted page) is
+adapted from [MaxDev43/Marketplace-Parser](https://github.com/MaxDev43/Marketplace-Parser). A
+first attempt using [Scrapling](https://github.com/D4Vinci/Scrapling)'s browser automation was
+reliably blocked by Ozon's antibot; studying MaxDev43's working implementation is what got the
+integration past it. See `ozon-scraper/README.md` for the full story.
+
 ## Contributing
 
 - `master` is branch-protected — work happens on a `feature/...` branch and lands via PR once CI
