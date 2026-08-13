@@ -5,23 +5,23 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 /**
- * Configuration for connecting to Ozon's Seller API, bound from {@code easysearch.marketplaces.ozon.*}.
+ * Configuration for connecting to the {@code ozon-scraper} service, bound from
+ * {@code easysearch.marketplaces.ozon.*}.
  *
- * @param baseUrl        the Ozon API base URL
- * @param apiKey         the seller API key
- * @param clientId       the seller client ID
+ * @param baseUrl        the ozon-scraper service base URL
  * @param connectTimeout HTTP connect timeout; defaults to 2 seconds if unset
- * @param readTimeout    HTTP read timeout; defaults to 5 seconds if unset
+ * @param readTimeout    HTTP read timeout; defaults to 20 seconds if unset — ozon-scraper can take
+ *                       10+ seconds on a cold session while it passes Ozon's antibot challenge
  */
 @ConfigurationProperties(prefix = "easysearch.marketplaces.ozon")
-public record OzonProperties(String baseUrl, String apiKey, String clientId, Duration connectTimeout, Duration readTimeout) {
+public record OzonProperties(String baseUrl, Duration connectTimeout, Duration readTimeout) {
 
     public OzonProperties {
         if (connectTimeout == null) {
             connectTimeout = Duration.ofSeconds(2);
         }
         if (readTimeout == null) {
-            readTimeout = Duration.ofSeconds(5);
+            readTimeout = Duration.ofSeconds(20);
         }
     }
 }
