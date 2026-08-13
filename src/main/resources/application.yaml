@@ -24,11 +24,13 @@ server:
 
 easysearch:
   marketplaces:
-    search-timeout: 3s
-    compare-timeout: 5s
+    # Ozon's scraper can take 10+ seconds on a cold session (passing its antibot challenge);
+    # these are generous enough to let it finish rather than cutting it off mid-flight. Clients
+    # run in parallel, so fast marketplaces (Wildberries, Yandex Market) aren't slowed down by
+    # this — overall latency is bounded by the slowest client, not the sum.
+    search-timeout: 20s
+    compare-timeout: 25s
     ozon:
-      base-url: https://api-seller.ozon.ru
-      api-key: ${OZON_API_KEY:}
-      client-id: ${OZON_CLIENT_ID:}
+      base-url: ${OZON_SCRAPER_URL:http://localhost:8000}
       connect-timeout: 2s
-      read-timeout: 5s
+      read-timeout: 20s
