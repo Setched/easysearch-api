@@ -17,7 +17,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 /**
  * Verifies {@link OzonMarketplaceClient}'s HTTP request/response handling against a mocked REST server.
- * Does not exercise the real Ozon API.
+ * Does not exercise the real ozon-scraper service or the live Ozon site.
  */
 class OzonMarketplaceClientTest {
 
@@ -26,10 +26,10 @@ class OzonMarketplaceClientTest {
      */
     @Test
     void mapsOzonSearchResponseToMarketplaceOffers() {
-        RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("https://api-seller.ozon.ru");
+        RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("http://localhost:8000");
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
 
-        server.expect(requestTo("https://api-seller.ozon.ru/v1/search?text=iphone%2015"))
+        server.expect(requestTo("http://localhost:8000/search?query=iphone%2015"))
                 .andExpect(method(org.springframework.http.HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {
@@ -58,10 +58,10 @@ class OzonMarketplaceClientTest {
      */
     @Test
     void returnsEmptyListWhenResponseHasNoItems() {
-        RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("https://api-seller.ozon.ru");
+        RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("http://localhost:8000");
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
 
-        server.expect(requestTo("https://api-seller.ozon.ru/v1/search?text=unknown"))
+        server.expect(requestTo("http://localhost:8000/search?query=unknown"))
                 .andRespond(withSuccess("{\"items\": []}", MediaType.APPLICATION_JSON));
 
         OzonMarketplaceClient client = new OzonMarketplaceClient(restClientBuilder.build());

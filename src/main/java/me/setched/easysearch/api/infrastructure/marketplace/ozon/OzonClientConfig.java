@@ -8,17 +8,17 @@ import org.springframework.web.client.RestClient;
 import java.net.http.HttpClient;
 
 /**
- * Wires up the {@link RestClient} used by {@link OzonMarketplaceClient}, applying connection/read timeouts
- * and authentication headers from {@link OzonProperties}.
+ * Wires up the {@link RestClient} used by {@link OzonMarketplaceClient} to call the {@code ozon-scraper}
+ * service, applying connection/read timeouts from {@link OzonProperties}.
  */
 @Configuration
 public class OzonClientConfig {
 
     /**
-     * Builds the Ozon-specific REST client.
+     * Builds the REST client pointed at the ozon-scraper service.
      *
-     * @param properties Ozon connection settings
-     * @return a configured {@link RestClient} for Ozon's Seller API
+     * @param properties ozon-scraper connection settings
+     * @return a configured {@link RestClient} for the ozon-scraper service
      */
     @Bean
     public RestClient ozonRestClient(OzonProperties properties) {
@@ -32,8 +32,6 @@ public class OzonClientConfig {
         return RestClient.builder()
                 .baseUrl(properties.baseUrl())
                 .requestFactory(requestFactory)
-                .defaultHeader("Client-Id", properties.clientId())
-                .defaultHeader("Api-Key", properties.apiKey())
                 .build();
     }
 }

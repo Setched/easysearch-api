@@ -9,22 +9,22 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 /**
- * {@link MarketplaceClient} adapter for Ozon, backed by an HTTP call via {@link RestClient}.
- * <p>
- * <b>Known limitation:</b> this targets Ozon's Seller API ({@code api-seller.ozon.ru}), which is scoped to a
- * registered seller's own catalog and does not expose free-text search across the whole marketplace. This
- * adapter is not currently a working end-to-end integration — see project notes.
+ * {@link MarketplaceClient} adapter for Ozon. Ozon has no public search API — this calls the sibling
+ * {@code ozon-scraper} service (see {@code ozon-scraper/README.md}), which calls Ozon's internal
+ * page-data API through a persistent, antibot-challenged browser session and returns results in the
+ * same shape this class used to expect from a real API.
  */
 public class OzonMarketplaceClient implements MarketplaceClient {
 
-    private static final String SEARCH_PATH = "/v1/search";
+    private static final String SEARCH_PATH = "/search";
 
     private final RestClient ozonRestClient;
 
     /**
-     * Creates a client using the given, already-configured, Ozon REST client.
+     * Creates a client using the given, already-configured, REST client pointed at the ozon-scraper
+     * service.
      *
-     * @param ozonRestClient the configured REST client for Ozon
+     * @param ozonRestClient the configured REST client for the ozon-scraper service
      */
     public OzonMarketplaceClient(RestClient ozonRestClient) {
         this.ozonRestClient = ozonRestClient;
@@ -36,7 +36,7 @@ public class OzonMarketplaceClient implements MarketplaceClient {
     @Override
     public List<MarketplaceOffer> search(SearchQuery query) {
         OzonSearchResponse response = ozonRestClient.get()
-                .uri(uriBuilder -> uriBuilder.path(SEARCH_PATH).queryParam("text", query.query()).build())
+                .uri(uriBuilder -> uriBuilder.path(SEARCH_PATH).queryParam("query", query.query()).build())
                 .retrieve()
                 .body(OzonSearchResponse.class);
 

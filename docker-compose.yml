@@ -11,5 +11,11 @@ services:
     volumes:
       - easysearch_postgres_data:/var/lib/postgresql/data
 
+  ozon-scraper:
+    build: ./ozon-scraper
+    container_name: easysearch-ozon-scraper
+    ports:
+      - "8000:8000"
+
 volumes:
   easysearch_postgres_data:
