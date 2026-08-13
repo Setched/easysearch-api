@@ -10,7 +10,8 @@ import java.time.Duration;
  *
  * @param baseUrl        the ozon-scraper service base URL
  * @param connectTimeout HTTP connect timeout; defaults to 2 seconds if unset
- * @param readTimeout    HTTP read timeout; defaults to 5 seconds if unset
+ * @param readTimeout    HTTP read timeout; defaults to 20 seconds if unset — ozon-scraper can take
+ *                       10+ seconds on a cold session while it passes Ozon's antibot challenge
  */
 @ConfigurationProperties(prefix = "easysearch.marketplaces.ozon")
 public record OzonProperties(String baseUrl, Duration connectTimeout, Duration readTimeout) {
@@ -20,7 +21,7 @@ public record OzonProperties(String baseUrl, Duration connectTimeout, Duration r
             connectTimeout = Duration.ofSeconds(2);
         }
         if (readTimeout == null) {
-            readTimeout = Duration.ofSeconds(5);
+            readTimeout = Duration.ofSeconds(20);
         }
     }
 }
