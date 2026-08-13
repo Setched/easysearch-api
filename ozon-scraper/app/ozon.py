@@ -23,7 +23,17 @@ class OzonItem:
 
 
 def search(session: OzonSession, query: str) -> list[OzonItem]:
-    """Fetches the first page of Ozon search results for the given query."""
+    """Fetches the first page of Ozon search results for the given query.
+
+    Deliberately not paginated beyond Ozon's first page for now — there's no caller need for it
+    yet (see MarketplaceClient.search(SearchQuery) on the Java side, which has no pagination/limit
+    concept either). When "load more" or a result-count filter is actually needed: the JSON here
+    carries a "nextPage" path (top-level, or nested in the "infiniteVirtualPaginator"/"paginator"
+    widget on this first page) that can be re-fetched the same way to keep pulling more items up
+    to some limit — see MaxDev43/Marketplace-Parser's paginator_next_page()/search() for the
+    reference implementation of that loop. Extending SearchQuery (Java) with a page/limit field
+    would need to happen alongside it.
+    """
     path = f"{SEARCH_PATH}?{urlencode({'text': query, 'from_global': 'true'})}"
     page = session.fetch_json(path)
     return _parse_search_items(page)
