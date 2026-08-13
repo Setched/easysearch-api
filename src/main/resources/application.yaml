@@ -27,8 +27,6 @@ easysearch:
     search-timeout: 3s
     compare-timeout: 5s
     ozon:
-      base-url: https://api-seller.ozon.ru
-      api-key: ${OZON_API_KEY:}
-      client-id: ${OZON_CLIENT_ID:}
+      base-url: ${OZON_SCRAPER_URL:http://localhost:8000}
       connect-timeout: 2s
       read-timeout: 5s
