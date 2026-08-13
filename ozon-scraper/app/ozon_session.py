@@ -79,13 +79,23 @@ class OzonSession:
             self._launch()
 
         self._page = self._context.new_page()
-        response = self._page.goto(HOME_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+        self._page.goto(HOME_URL, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         # The antibot's JS challenge needs real wall-clock time to resolve — waiting for
         # network idle isn't enough, since the challenge page itself goes network-idle fast.
         self._page.wait_for_timeout(int(CHALLENGE_WAIT_S * 1000))
 
+        # The HTTP status of the *initial* response isn't a reliable signal by itself — a 307
+        # redirect here is normal and not itself a sign of failure. What matters is what actually
+        # rendered: real Ozon pages are large and mention "ozon"; the antibot's block/challenge
+        # pages are short and don't.
         title = self._page.title() or ""
-        if response is None or not response.ok or _CHALLENGE_TITLE_MARKERS.search(title):
+        try:
+            content = self._page.content()
+        except Exception:
+            content = ""
+        looks_like_ozon = "ozon" in content.lower() and len(content) > 50_000
+
+        if not looks_like_ozon or _CHALLENGE_TITLE_MARKERS.search(title):
             raise OzonBlockedError(f"Ozon antibot challenge not passed (title: {title!r})")
 
         self._challenged = True

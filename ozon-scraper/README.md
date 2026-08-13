@@ -39,10 +39,11 @@ reused for subsequent requests within the same process.
 
 ## Status
 
-Not yet verified against the live site — this environment couldn't reach Ozon to test. If
-`/search` comes back empty:
+Verified working against the live site (manually, outside this repo's sandboxed dev environment)
+— a real search returns real Ozon offers with correct name/price/url. If it stops working later
+(Ozon changes things periodically):
 - Check the logs first — `OzonBlockedError` means the antibot challenge itself failed (network/IP
-  reputation issue, same as before — see project history), not a parsing problem.
+  reputation issue — see closed PR #11 for what that looks like), not a parsing problem.
 - If the challenge passes but `items` is still empty, Ozon's `tileGridDesktop` widget JSON shape
   has likely changed — update the field paths in `_parse_search_items()` in `app/ozon.py` to
   match. Log the raw JSON from `session.fetch_json()` to inspect the actual shape.
