@@ -1,0 +1,6 @@
+target/
+.git/
+.idea/
+*.iml
+ozon-scraper/
+HELP.md
