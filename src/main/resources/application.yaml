@@ -2,9 +2,9 @@ spring:
   application:
     name: easysearch-api
   datasource:
-    url: jdbc:postgresql://localhost:5432/easysearch
-    username: easysearch
-    password: easysearch
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:easysearch}
+    username: ${DB_USERNAME:easysearch}
+    password: ${DB_PASSWORD:easysearch}
     driver-class-name: org.postgresql.Driver
 
   jpa:

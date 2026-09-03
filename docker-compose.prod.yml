@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: easysearch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: easysearch
+      POSTGRES_USER: easysearch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - easysearch_postgres_data:/var/lib/postgresql/data
+
+  ozon-scraper:
+    build: ./ozon-scraper
+    container_name: easysearch-ozon-scraper
+    restart: unless-stopped
+    # Chromium needs more than Docker's default 64MB /dev/shm or the renderer
+    # crashes under normal use, independent of how much RAM the host has free.
+    shm_size: "1gb"
+
+  easysearch-api:
+    build: .
+    container_name: easysearch-api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - ozon-scraper
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: easysearch
+      DB_USERNAME: easysearch
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      OZON_SCRAPER_URL: http://ozon-scraper:8000
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: easysearch-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - easysearch-api
+
+volumes:
+  easysearch_postgres_data:
+  caddy_data:
+  caddy_config:
