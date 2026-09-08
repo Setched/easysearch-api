@@ -34,3 +34,7 @@ easysearch:
       base-url: ${OZON_SCRAPER_URL:http://localhost:8000}
       connect-timeout: 2s
       read-timeout: 20s
+    wildberries:
+      base-url: ${WILDBERRIES_SCRAPER_URL:http://localhost:8001}
+      connect-timeout: 2s
+      read-timeout: 20s

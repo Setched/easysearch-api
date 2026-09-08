@@ -17,5 +17,11 @@ services:
     ports:
       - "8000:8000"
 
+  wildberries-scraper:
+    build: ./wildberries-scraper
+    container_name: easysearch-wildberries-scraper
+    ports:
+      - "8001:8001"
+
 volumes:
   easysearch_postgres_data:
