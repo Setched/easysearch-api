@@ -18,6 +18,12 @@ services:
     # crashes under normal use, independent of how much RAM the host has free.
     shm_size: "1gb"
 
+  wildberries-scraper:
+    build: ./wildberries-scraper
+    container_name: easysearch-wildberries-scraper
+    restart: unless-stopped
+    shm_size: "1gb"
+
   easysearch-api:
     build: .
     container_name: easysearch-api
@@ -25,6 +31,7 @@ services:
     depends_on:
       - postgres
       - ozon-scraper
+      - wildberries-scraper
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -32,6 +39,7 @@ services:
       DB_USERNAME: easysearch
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       OZON_SCRAPER_URL: http://ozon-scraper:8000
+      WILDBERRIES_SCRAPER_URL: http://wildberries-scraper:8001
 
   caddy:
     image: caddy:2-alpine

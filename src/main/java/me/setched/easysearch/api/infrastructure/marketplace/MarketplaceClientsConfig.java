@@ -48,14 +48,16 @@ public class MarketplaceClientsConfig {
     /**
      * The Wildberries client, wrapped with a timeout.
      *
+     * @param wildberriesRestClient   the configured REST client for Wildberries
      * @param properties              shared marketplace resilience settings
      * @param marketplaceClientExecutor executor used to enforce the timeout
      * @return the timeout-enforced Wildberries client
      */
     @Bean
-    public MarketplaceClient wildberriesMarketplaceClient(MarketplaceClientsProperties properties, ExecutorService marketplaceClientExecutor) {
+    public MarketplaceClient wildberriesMarketplaceClient(RestClient wildberriesRestClient, MarketplaceClientsProperties properties,
+                                                            ExecutorService marketplaceClientExecutor) {
         return new TimeoutEnforcingMarketplaceClient(
-                "Wildberries", new WildberriesMarketplaceClient(), properties.searchTimeout(), marketplaceClientExecutor);
+                "Wildberries", new WildberriesMarketplaceClient(wildberriesRestClient), properties.searchTimeout(), marketplaceClientExecutor);
     }
 
     /**
