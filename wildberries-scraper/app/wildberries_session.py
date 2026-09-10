@@ -1,26 +1,18 @@
 """Persistent browser session for calling Wildberries' internal search API.
 
-v4 approach (see wildberries-scraper/README.md's Status section for the full history — v1
-through v3 all failed identically against WBAAS, Wildberries' antibot, regardless of headers,
-network-interception vs manual fetch, hand-rolled stealth JS patches, fake mouse/scroll activity,
-or how long we were willing to wait). v3's conclusion was that the failing signal was likely below
-what JS property patching can reach. This version switches the underlying automation library
-entirely: from plain `playwright` to `patchright` (https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python),
-a maintained fork that patches Chromium's own DevTools-protocol-level "tells" (e.g. the
-`Runtime.enable` CDP leak) rather than just JS-visible properties — a lower layer than anything
-v1-v3 touched.
+Wildberries' antibot (WBAAS) fingerprints the browser below what JS-property patching can reach —
+plain headless Playwright, even with hand-rolled stealth JS patches, was reliably detected (full
+history of what didn't work in wildberries-scraper/README.md's Status section). What passes it:
+[`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python) instead of plain
+`playwright` (patches Chromium's DevTools-protocol-level automation tells, e.g. the
+`Runtime.enable` CDP leak), driving a real headful Chrome (`channel="chrome"`, `headless=False`,
+via Xvfb — see Dockerfile) with a persistent on-disk profile, and deliberately *no* manual
+User-Agent or fingerprint faking on top — patchright's own docs warn that faking properties over
+its patches makes the fingerprint more inconsistent, not less.
 
-Per patchright's own documented best practice for staying undetected, this also switches to:
-- Headful mode with a real Chrome channel (not headless Chromium) — run via Xvfb in the
-  Dockerfile, since headless mode itself has detectable quirks no amount of JS patching removes.
-- `launch_persistent_context()` with a real on-disk profile directory, instead of an ephemeral
-  incognito-style context.
-- No manual User-Agent override and no hand-rolled stealth init script (both present in v3) —
-  patchright's docs explicitly warn that faking additional properties on top of its own patches
-  can make the fingerprint look *more* inconsistent, not less.
-
-`_simulate_human_activity()` (fake mouse/scroll activity) is kept, since it doesn't touch browser
-fingerprinting and was a reasonable idea independent of whether v3's stealth patches helped.
+The actual request is made by navigating to the real search-results page and intercepting *its
+own* call to the internal search API (`fetch_search()`'s `expect_response()`), rather than
+crafting our own `fetch()` — the page's own JS is what needs to satisfy WBAAS.
 """
 
 import logging
@@ -64,9 +56,9 @@ def _simulate_human_activity(page: Page) -> None:
 
 
 class WildberriesSession:
-    """A single, reusable browser session. Not thread-safe — callers must serialize access
-    (see the lock in main.py), since a Playwright/patchright sync Page isn't safe for concurrent
-    use."""
+    """A single, reusable browser session. Not thread-safe, and its patchright objects are bound
+    to whichever thread first launches them — callers must pin every call to one dedicated thread
+    (see the single-worker executor in main.py), not just serialize with a lock."""
 
     def __init__(self) -> None:
         self._playwright = None
