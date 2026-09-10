@@ -51,17 +51,48 @@ Wildberries' own `__wbaas/challenges/antibot` (WBAAS). Findings from live debugg
    text; it doesn't execute the embedded script, so nothing about this challenge actually gets
    "solved" the way a real page navigation would solve it. This is the open problem.
 
-**Next things to try** (not yet attempted):
-- Whatever cookie/token WBAAS's challenge script sets on success is presumably required on the
-  search request; the reference project's cookie-replay approach (bootstrap via Playwright, then
-  curl_cffi with those cookies) might work here specifically because that bootstrap process
-  happens to trigger and pass this challenge via a real navigation, where we don't. Worth
-  comparing exactly which cookies the reference implementation ends up with after bootstrap
-  against what we have (only `x_wbaas_token` observed so far).
-- Consider whether the challenge only appears for XHR/fetch-style calls specifically (vs. how the
-  page's own internal SPA code calls this same endpoint) — if so, intercepting the *page's own*
-  network request (via Playwright's `page.on("response")`) after simulating a real search
-  interaction, rather than issuing our own manual `fetch()`, may sidestep the challenge entirely.
+**v2 attempt (2026-09-10, same session continued from a break):** rewrote the whole approach per
+the first bullet above — instead of crafting our own `fetch()`, navigate to the real search page
+and intercept *the page's own* request to the search API via `page.expect_response()`
+(`app/wildberries_session.py`). Also re-confirmed and fixed an environment gotcha: Cloudflare WARP
+had silently re-enabled itself (auto-starts) and needed disabling again before retesting — same
+effect as before.
+
+With that in place, live testing revealed WBAAS is considerably more sophisticated than a simple
+JS-timer challenge (unlike Ozon's). Logging every request the page makes (`page.on("request")`)
+showed a clear, repeating pattern — the same ~11 URLs cycling **exactly 4 times** (43 requests
+total) before giving up:
+```
+catalog/0/search.aspx?search=... (reload)
+__wbaas/challenges/antibot/__static/v2/index-*.js
+__wbaas/challenges/antibot/__static/v2/browser-check.js       <- checks the browser itself
+__wbaas/challenges/antibot/api/v1/find-frontend-settings
+__wbaas/challenges/antibot/statics/challenge-solver_v1.0.8.js
+__wbaas/challenges/antibot/statics/behavior-tracker_v1.0.3.js <- tracks mouse/scroll/etc.
+__wbaas/challenges/antibot/api/v1/create-token  (x2)
+```
+The named files are self-explanatory: `browser-check.js` fingerprints the browser itself (likely
+`navigator.webdriver`, headless-specific quirks, etc. beyond the one flag we currently disable),
+and `behavior-tracker.js` watches for human-like interaction. Added a minimal fake interaction
+(mouse move + scroll + a few seconds of wall-clock wait) inside the same navigation — **no
+effect**, identical 4x loop and 43 requests both with and without it. So this isn't just "we never
+touched the mouse" — either the fingerprint check itself fails first (most likely: our headless
+Chromium probably reads as headless/automated to `browser-check.js` regardless of mouse activity),
+or the behavior tracker needs a much more realistic interaction pattern than two mouse moves and a
+wheel event.
+
+**Next things to try** (not yet attempted, roughly in order of effort):
+- A proper stealth-patched Chromium (e.g. a maintained `patchright`/undetected-playwright-style
+  fork, or manually patching more `navigator`/`window` fingerprint surfaces than just
+  `--disable-blink-features=AutomationControlled`) to see if `browser-check.js` is the actual
+  blocker before investing in behavior simulation at all.
+- If fingerprinting isn't the issue: more realistic, continuous interaction (small randomized
+  mouse movements over several seconds, not two discrete jumps) to satisfy the behavior tracker.
+- Reconsider priority: the reference project's README claims "на Wildberries анти-бот слабее"
+  (Wildberries' antibot is weaker), which does not match what we're finding — WBAAS looks at least
+  as sophisticated as Ozon's antibot, possibly more. Worth revisiting whether Wildberries is
+  actually the easier next target compared to Yandex Market, which hasn't been investigated at all
+  yet.
 
 If it stops working differently later:
 - Check the logs first — `WildberriesBlockedError` messages now include the HTTP status and a
