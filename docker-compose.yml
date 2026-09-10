@@ -22,6 +22,7 @@ services:
     container_name: easysearch-wildberries-scraper
     ports:
       - "8001:8001"
+    shm_size: "1gb"
 
 volumes:
   easysearch_postgres_data:

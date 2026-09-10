@@ -81,18 +81,41 @@ Chromium probably reads as headless/automated to `browser-check.js` regardless o
 or the behavior tracker needs a much more realistic interaction pattern than two mouse moves and a
 wheel event.
 
-**Next things to try** (not yet attempted, roughly in order of effort):
-- A proper stealth-patched Chromium (e.g. a maintained `patchright`/undetected-playwright-style
-  fork, or manually patching more `navigator`/`window` fingerprint surfaces than just
-  `--disable-blink-features=AutomationControlled`) to see if `browser-check.js` is the actual
-  blocker before investing in behavior simulation at all.
-- If fingerprinting isn't the issue: more realistic, continuous interaction (small randomized
-  mouse movements over several seconds, not two discrete jumps) to satisfy the behavior tracker.
-- Reconsider priority: the reference project's README claims "на Wildberries анти-бот слабее"
-  (Wildberries' antibot is weaker), which does not match what we're finding — WBAAS looks at least
-  as sophisticated as Ozon's antibot, possibly more. Worth revisiting whether Wildberries is
-  actually the easier next target compared to Yandex Market, which hasn't been investigated at all
-  yet.
+**v3 attempt (same session, immediately after v2):** combined both remaining ideas — a hand-rolled
+stealth init script (`_STEALTH_INIT_SCRIPT` in `wildberries_session.py`, the standard
+`puppeteer-extra-plugin-stealth` core patch set: fakes `navigator.webdriver`, `window.chrome`,
+`navigator.plugins`, WebGL vendor/renderer strings, etc.) plus a much more realistic
+`_simulate_human_activity()` (randomized multi-step mouse movement and scrolling over several
+seconds instead of two discrete jumps). Also bumped the response-wait timeout from 30s to 90s, in
+case the challenge just needed more real wall-clock time (the way Ozon's does, just more of it).
+
+**Result: no change at all**, and this is the most conclusive finding yet. Across three separate
+runs — stealth+behavior-sim at 30s, then again at 90s — the request log is **byte-for-byte
+identical every time**: the same ~11 URLs cycling through exactly **4 attempts** (confirmed by
+counting page reloads in the 90s run: 12 total across 3 retries = 4 per attempt), then the page
+just stops issuing requests on its own, well before any of our timeouts would even matter. This
+rules out "not enough real time" as the bottleneck — WBAAS's own client-side logic gives up after
+a fixed 4 attempts regardless of how long we're willing to wait afterward, and neither the stealth
+patches nor the fake interaction changed that outcome even slightly.
+
+**Conclusion:** this specific technique — Playwright-driven headless Chromium, however patched at
+the JS level — appears to be reliably and consistently detected/rejected by WBAAS. The complete
+lack of any variation across four materially different attempts (raw fetch, network interception,
++stealth, +longer timeout) suggests the actual failing signal is something none of these touch —
+plausibly something at a lower level than JS property patching can reach (e.g. how genuinely
+"headless" Chromium's rendering/networking stack differs from a real user's browser even with
+every `navigator.*` property faked, or IP-reputation signals unrelated to browser fingerprint at
+all). Further progress would likely need tooling beyond hand-rolled patches — e.g. a maintained
+undetected-browser fork (`patchright` or similar, which patches Chromium's own DevTools protocol
+surface rather than just JS-visible properties) or a residential-IP proxy — both bigger
+investments than reasonable to take on speculatively without knowing they'd actually help.
+
+**Recommendation:** deprioritize Wildberries for now. The reference project's claim that "на
+Wildberries анти-бот слабее" (Wildberries' antibot is weaker than Ozon's) does not match what
+extensive live testing found here — WBAAS is at least as sophisticated as Ozon's antibot, and four
+attempts across two sessions found no path through it. Yandex Market (completely uninvestigated)
+is worth trying next instead, on the chance it turns out to be the actually-easier target that
+Wildberries was assumed to be.
 
 If it stops working differently later:
 - Check the logs first — `WildberriesBlockedError` messages now include the HTTP status and a
