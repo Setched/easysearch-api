@@ -25,11 +25,13 @@ server:
 easysearch:
   marketplaces:
     # Ozon's scraper can take 10+ seconds on a cold session (passing its antibot challenge);
-    # these are generous enough to let it finish rather than cutting it off mid-flight. Clients
-    # run in parallel, so fast marketplaces (Wildberries, Yandex Market) aren't slowed down by
-    # this — overall latency is bounded by the slowest client, not the sum.
-    search-timeout: 20s
-    compare-timeout: 25s
+    # Wildberries' can take up to ~20s (observed 8-20s live, via a headful patchright/real-Chrome
+    # session passing Wildberries' WBAAS antibot — see wildberries-scraper/README.md). These are
+    # generous enough to let either finish rather than cutting them off mid-flight. Clients run in
+    # parallel, so fast marketplaces (Yandex Market) aren't slowed down by this — overall latency
+    # is bounded by the slowest client, not the sum.
+    search-timeout: 45s
+    compare-timeout: 50s
     ozon:
       base-url: ${OZON_SCRAPER_URL:http://localhost:8000}
       connect-timeout: 2s
@@ -37,4 +39,4 @@ easysearch:
     wildberries:
       base-url: ${WILDBERRIES_SCRAPER_URL:http://localhost:8001}
       connect-timeout: 2s
-      read-timeout: 20s
+      read-timeout: 45s

@@ -8,13 +8,8 @@ see [WildberriesClientConfig.java](../src/main/java/me/setched/easysearch/api/in
 ## Where this technique came from
 
 Adapted from [MaxDev43/Marketplace-Parser](https://github.com/MaxDev43/Marketplace-Parser)
-(`parsers/wildberries.py`), same source credited in the sibling `ozon-scraper`. One difference:
-the reference implementation bootstraps a session with Playwright, then closes the browser and
-replays the captured cookies over a plain HTTP client (`curl_cffi`, for TLS fingerprint
-impersonation) for actual searches. This service instead keeps the browser open and issues the
-search as a `fetch()` from inside the already-loaded page — the same approach `ozon-scraper` uses
-— to avoid an extra dependency and because a real browser's own fetch is at least as convincing to
-an antibot as a replayed session.
+(`parsers/wildberries.py`), same source credited in the sibling `ozon-scraper`, though the working
+approach here ended up diverging from it substantially — see Status below for why.
 
 ## Endpoint
 
@@ -24,17 +19,57 @@ an antibot as a replayed session.
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium
+patchright install --with-deps chrome
 uvicorn app.main:app --reload --port 8001
 curl "http://localhost:8001/search?query=iphone+15"
 ```
 
+Needs an X display to run headful outside Docker (see `Dockerfile` for how the container provides
+one via Xvfb) — on a normal desktop this isn't an issue, it'll just open a visible Chrome window.
+
 ## Status
 
-**Not working yet against the live site** (per the project's own rule: don't claim a marketplace
-integration works without live verification). Built by porting the reference project's technique,
-but live testing surfaced a real, named antibot system gating the search API specifically —
-Wildberries' own `__wbaas/challenges/antibot` (WBAAS). Findings from live debugging, in order:
+**Working, live-verified end-to-end** (2026-09-10) — confirmed through the full chain: Java app →
+this service → real wildberries.ru → real offers back. Getting here took four attempts across two
+sessions; the full history is kept below because it explains *why* the final approach looks the
+way it does, and will matter again if Wildberries changes its defenses.
+
+### What finally worked (v4)
+
+Wildberries' antibot (WBAAS, see v1-v3 below) turned out to require going a level deeper than
+JS-visible browser properties. The winning combination, all three parts load-bearing:
+
+1. **[`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python) instead of plain
+   `playwright`** — a maintained fork that patches Chromium's own DevTools-protocol-level
+   automation "tells" (e.g. the `Runtime.enable` CDP leak), not just JS properties. Drop-in
+   replacement: same API, just `from patchright.sync_api import ...`.
+2. **Headful real Chrome, not headless Chromium** — `channel="chrome"`,
+   `headless=False`, run via Xvfb in the Dockerfile (`app/wildberries_session.py` no longer
+   launches headless at all). Patchright's own docs recommend this as the least detectable
+   configuration; headless mode has quirks no JS patching removes.
+3. **No manual fingerprint faking** — the v3 attempt's hand-rolled stealth init script and
+   User-Agent override are both gone. Patchright's docs explicitly warn that faking properties on
+   top of its own patches makes the fingerprint look *more* inconsistent, not less — once
+   patchright + headful Chrome is doing the work, added fakery only hurts.
+
+Also switched `launch()` + `new_context()` to `launch_persistent_context()` with a real on-disk
+Chrome profile directory (`PROFILE_DIR`), per the same best-practice docs.
+
+**Observed live latency:** 8-20 seconds per search (varies by query/run) — well inside the
+timeouts (raised to 45s/50s in `application.yaml` to give headroom; the previous 20s/25s, sized
+for Ozon, were too tight once actually measured against Wildberries).
+
+**A real, separate bug found and fixed along the way:** retrying inside `fetch_search()`
+(re-launching the session) could crash with `greenlet.error: Cannot switch to a different thread`
+— Playwright/patchright's sync API is bound to whichever OS thread first started it, but FastAPI
+dispatches each request to a thread from Starlette's own pool, which can differ between requests
+sharing the same long-lived `WildberriesSession`. Fixed in `app/main.py` by routing all session
+access through a dedicated single-worker `ThreadPoolExecutor` instead of just a lock — a lock
+prevents concurrent access but doesn't pin *which* thread runs the code.
+
+### v1-v3: what didn't work, and why it's still useful to know
+
+Findings from live debugging, in order:
 
 1. Direct navigation to the search page with no warm-up was flat-out blocked (HTTP `498`, ~1.6KB
    of content — a block page, not a real one). Turned out to correlate with Cloudflare WARP being
@@ -98,24 +133,13 @@ rules out "not enough real time" as the bottleneck — WBAAS's own client-side l
 a fixed 4 attempts regardless of how long we're willing to wait afterward, and neither the stealth
 patches nor the fake interaction changed that outcome even slightly.
 
-**Conclusion:** this specific technique — Playwright-driven headless Chromium, however patched at
-the JS level — appears to be reliably and consistently detected/rejected by WBAAS. The complete
-lack of any variation across four materially different attempts (raw fetch, network interception,
-+stealth, +longer timeout) suggests the actual failing signal is something none of these touch —
-plausibly something at a lower level than JS property patching can reach (e.g. how genuinely
-"headless" Chromium's rendering/networking stack differs from a real user's browser even with
-every `navigator.*` property faked, or IP-reputation signals unrelated to browser fingerprint at
-all). Further progress would likely need tooling beyond hand-rolled patches — e.g. a maintained
-undetected-browser fork (`patchright` or similar, which patches Chromium's own DevTools protocol
-surface rather than just JS-visible properties) or a residential-IP proxy — both bigger
-investments than reasonable to take on speculatively without knowing they'd actually help.
-
-**Recommendation:** deprioritize Wildberries for now. The reference project's claim that "на
-Wildberries анти-бот слабее" (Wildberries' antibot is weaker than Ozon's) does not match what
-extensive live testing found here — WBAAS is at least as sophisticated as Ozon's antibot, and four
-attempts across two sessions found no path through it. Yandex Market (completely uninvestigated)
-is worth trying next instead, on the chance it turns out to be the actually-easier target that
-Wildberries was assumed to be.
+**Conclusion at the time (proven wrong by v4, kept for context):** we thought the complete lack of
+variation across raw fetch, network interception, +stealth, and +longer timeout meant the failing
+signal was unreachable by hand-rolled patches. That was half right — it *was* below the JS
+property layer — but "unreachable" turned out to mean "needs patchright's CDP-level patches +
+headful Chrome," not "needs a residential proxy or reverse-engineering the challenge script." The
+IP-reputation angle specifically was tested (see the "server IP" experiment) and ruled out: running
+from the production VPS's datacenter IP produced the identical failure pattern as the dev machine.
 
 If it stops working differently later:
 - Check the logs first — `WildberriesBlockedError` messages now include the HTTP status and a
