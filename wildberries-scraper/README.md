@@ -8,13 +8,8 @@ see [WildberriesClientConfig.java](../src/main/java/me/setched/easysearch/api/in
 ## Where this technique came from
 
 Adapted from [MaxDev43/Marketplace-Parser](https://github.com/MaxDev43/Marketplace-Parser)
-(`parsers/wildberries.py`), same source credited in the sibling `ozon-scraper`. One difference:
-the reference implementation bootstraps a session with Playwright, then closes the browser and
-replays the captured cookies over a plain HTTP client (`curl_cffi`, for TLS fingerprint
-impersonation) for actual searches. This service instead keeps the browser open and issues the
-search as a `fetch()` from inside the already-loaded page — the same approach `ozon-scraper` uses
-— to avoid an extra dependency and because a real browser's own fetch is at least as convincing to
-an antibot as a replayed session.
+(`parsers/wildberries.py`), same source credited in the sibling `ozon-scraper`, though the working
+approach here ended up diverging from it substantially — see Status below for why.
 
 ## Endpoint
 
@@ -24,48 +19,73 @@ an antibot as a replayed session.
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium
+patchright install --with-deps chrome
 uvicorn app.main:app --reload --port 8001
 curl "http://localhost:8001/search?query=iphone+15"
 ```
 
+Needs an X display to run headful outside Docker (see `Dockerfile` for how the container provides
+one via Xvfb) — on a normal desktop this isn't an issue, it'll just open a visible Chrome window.
+
 ## Status
 
-**Not working yet against the live site** (per the project's own rule: don't claim a marketplace
-integration works without live verification). Built by porting the reference project's technique,
-but live testing surfaced a real, named antibot system gating the search API specifically —
-Wildberries' own `__wbaas/challenges/antibot` (WBAAS). Findings from live debugging, in order:
+**Working, live-verified end-to-end** (2026-09-10) — confirmed through the full chain: Java app →
+this service → real wildberries.ru → real offers back. Observed latency 8-20s per search
+(`search-timeout`/`compare-timeout` in `application.yaml` sized accordingly).
 
-1. Direct navigation to the search page with no warm-up was flat-out blocked (HTTP `498`, ~1.6KB
-   of content — a block page, not a real one). Turned out to correlate with Cloudflare WARP being
-   active on the dev machine — WARP's IP ranges apparently get treated as VPN traffic, which
-   marketplaces are known to distrust (see the reference project's own README: "не рекомендуется
-   использовать VPN"). Disabling WARP changed the failure mode entirely.
-2. With WARP off: navigation succeeded, but the `deviceid` header was empty — the SPA hadn't
-   finished hydrating (localStorage not yet populated) by the time a fixed delay elapsed. Fixed by
-   polling for it (`page.wait_for_function`) instead of guessing a delay, with a generated
-   fallback if it never appears — see `_find_device_id()` in `app/wildberries_session.py`.
-3. With a real deviceid: the search API call itself now returns HTTP `498` with a **full HTML
-   page** containing `<script src="/__wbaas/challenges/antibot/__static/v2/...">` — a genuine
-   JS-based antibot challenge, served as the API response body. `fetch()` receives this as inert
-   text; it doesn't execute the embedded script, so nothing about this challenge actually gets
-   "solved" the way a real page navigation would solve it. This is the open problem.
+### What makes it work
 
-**Next things to try** (not yet attempted):
-- Whatever cookie/token WBAAS's challenge script sets on success is presumably required on the
-  search request; the reference project's cookie-replay approach (bootstrap via Playwright, then
-  curl_cffi with those cookies) might work here specifically because that bootstrap process
-  happens to trigger and pass this challenge via a real navigation, where we don't. Worth
-  comparing exactly which cookies the reference implementation ends up with after bootstrap
-  against what we have (only `x_wbaas_token` observed so far).
-- Consider whether the challenge only appears for XHR/fetch-style calls specifically (vs. how the
-  page's own internal SPA code calls this same endpoint) — if so, intercepting the *page's own*
-  network request (via Playwright's `page.on("response")`) after simulating a real search
-  interaction, rather than issuing our own manual `fetch()`, may sidestep the challenge entirely.
+Wildberries' antibot (WBAAS) fingerprints at the browser level, not just JS-visible properties —
+plain headless Playwright, however patched with JS-level stealth tricks, was reliably detected
+(see "Dead ends" below). The combination that actually passes it, every part load-bearing:
 
-If it stops working differently later:
-- Check the logs first — `WildberriesBlockedError` messages now include the HTTP status and a
-  truncated response body, which is usually enough to tell a WBAAS challenge apart from a
-  malformed-request error or a changed response shape.
-- If the request succeeds but `items` is empty, Wildberries' `products` response shape has
-  likely changed — update the field paths in `_parse_products()` in `app/wildberries.py`.
+1. **[`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python) instead of plain
+   `playwright`** — a maintained fork patching Chromium's DevTools-protocol-level automation
+   "tells" (e.g. the `Runtime.enable` CDP leak), not just JS properties. Drop-in replacement:
+   `from patchright.sync_api import ...`.
+2. **Headful real Chrome, not headless Chromium** — `channel="chrome"`, `headless=False`, run via
+   Xvfb in the Dockerfile. Patchright's own docs recommend this as the least detectable setup.
+3. **No manual fingerprint faking on top** — no custom User-Agent, no hand-rolled stealth init
+   script. Patchright's docs warn that faking properties on top of its own patches makes the
+   fingerprint *more* inconsistent, not less.
+4. `launch_persistent_context()` with a real on-disk Chrome profile dir (`PROFILE_DIR`), not an
+   ephemeral incognito-style context — same best-practice docs.
+
+The request itself is made by navigating to the real search-results page and intercepting *its
+own* call to the internal search API (`page.expect_response()`), rather than crafting our own
+`fetch()` — the page's own JS is what needs to satisfy WBAAS, not a manual replay of its request.
+
+**A separate, real bug found and fixed along the way:** retrying inside `fetch_search()` could
+crash with `greenlet.error: Cannot switch to a different thread` — Playwright/patchright's sync
+API is bound to whichever OS thread first started it, but FastAPI can dispatch different requests
+sharing the same long-lived `WildberriesSession` to different threadpool threads. Fixed in
+`app/main.py` by routing all session access through a dedicated single-worker
+`ThreadPoolExecutor` — a lock alone prevents concurrent access but doesn't pin *which* thread runs
+the code.
+
+### Dead ends (kept short — useful if WBAAS's defenses change again)
+
+- **Manual `fetch()` with hand-assembled headers/deviceid:** got past an initial hard block (see
+  next bullet) but the search API itself always 403'd or 498'd — WBAAS serves its
+  `__wbaas/challenges/antibot/...` JS challenge as the response body, which a plain `fetch()`
+  can't execute.
+- **Cloudflare WARP being active** looked like a much harder block than it was (instant HTTP 498
+  on the very first navigation) — it auto-re-enables between machine restarts, so always check
+  it's off before live-testing WB, not just once.
+- **JS-level stealth (hand-rolled `navigator.*`/WebGL patches) + realistic fake mouse/scroll
+  activity + up to 90s of wait**, all combined: zero effect. The page reliably cycled through the
+  same ~11 WBAAS challenge URLs exactly 4 times, then gave up on its own regardless of how long we
+  waited — conclusive evidence the blocker was below the JS-property layer, which is what led to
+  trying patchright.
+- **Running from the production server's own datacenter IP** instead of the dev machine: same
+  failure pattern, ruling out IP reputation as the (sole) cause.
+
+### If it breaks again later
+
+- Check logs first — `WildberriesBlockedError` messages include the HTTP status and a truncated
+  response body, enough to tell a WBAAS challenge apart from a malformed request or a changed
+  response shape.
+- If the request succeeds but `items` is empty, Wildberries' `products` JSON shape has likely
+  changed — update the field paths in `_parse_products()` in `app/wildberries.py`.
+- If patchright itself starts failing, check for a Chrome version mismatch first — patchright
+  pins its patches to specific Chrome builds and can lag behind Google's release cadence.
