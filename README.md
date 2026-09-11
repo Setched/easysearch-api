@@ -25,6 +25,7 @@ and returns the cheapest offer, with pagination, sorting, and search history.
 | Database | PostgreSQL 16, migrated with Flyway |
 | Build | Maven |
 | Ozon integration | Sibling Python/FastAPI service (`ozon-scraper/`), Playwright-driven |
+| Wildberries integration | Sibling Python/FastAPI service (`wildberries-scraper/`), [`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python)-driven headful Chrome |
 | Architecture tests | ArchUnit |
 | Style enforcement | Checkstyle (Javadoc required on every type) |
 
@@ -36,11 +37,12 @@ breakdown, including why each marketplace client is wrapped in a shared timeout 
 queried in parallel.
 
 ```
-domain/          Business model + ports (MarketplaceClient, SearchHistoryRecorder)
-application/     Use case orchestration (CompareOffersService)
-infrastructure/  Adapters: marketplace clients, Postgres persistence, resilience decorators
-web/             REST controller, DTOs, error handling
-ozon-scraper/    Separate Python service — Ozon has no public API, so this scrapes it
+domain/               Business model + ports (MarketplaceClient, SearchHistoryRecorder)
+application/          Use case orchestration (CompareOffersService)
+infrastructure/       Adapters: marketplace clients, Postgres persistence, resilience decorators
+web/                  REST controller, DTOs, error handling
+ozon-scraper/         Separate Python service — Ozon has no public API, so this scrapes it
+wildberries-scraper/  Separate Python service — same idea, for Wildberries
 ```
 
 ## Prerequisites
@@ -75,27 +77,28 @@ ozon-scraper/    Separate Python service — Ozon has no public API, so this scr
    # {"status":"ok"}
    ```
 
-At this point, Wildberries and Yandex Market will respond (with stub data — see
-[Known limitations](#known-limitations)), but Ozon results will be empty unless you also start
-the scraper service:
+At this point, Yandex Market will respond (with stub data — see
+[Known limitations](#known-limitations)), but Ozon and Wildberries results will be empty unless
+you also start their scraper services:
 
-5. **(Optional) Start the Ozon scraper** — required for real Ozon results
+5. **(Optional) Start the scrapers** — required for real Ozon/Wildberries results
 
    Via Docker (simplest):
    ```bash
-   docker-compose up -d ozon-scraper
+   docker-compose up -d ozon-scraper wildberries-scraper
    ```
 
-   Or standalone, for local development/debugging (see `ozon-scraper/README.md` for details):
+   Or standalone, for local development/debugging (see each service's own README.md for details):
    ```bash
-   cd ozon-scraper
+   cd ozon-scraper        # or wildberries-scraper
    pip install -r requirements.txt
-   playwright install chromium
-   uvicorn app.main:app --reload
+   playwright install chromium   # wildberries-scraper: patchright install --with-deps chrome
+   uvicorn app.main:app --reload --port 8000   # wildberries-scraper: --port 8001
    ```
 
-   > Don't run both at once — they'd both try to bind port 8000. See `ozon-scraper/README.md` and
-   > [CLAUDE.md](CLAUDE.md) if you hit routing confusion between the two.
+   > Don't run a service both standalone and via Docker at once — they'd fight over the same
+   > port. See `ozon-scraper/README.md` / `wildberries-scraper/README.md` and
+   > [CLAUDE.md](CLAUDE.md) if you hit routing confusion.
 
 ## API
 
@@ -143,10 +146,11 @@ defaults):
 | Variable | Purpose | Default |
 |---|---|---|
 | `OZON_SCRAPER_URL` | Base URL of the `ozon-scraper` service | `http://localhost:8000` |
+| `WILDBERRIES_SCRAPER_URL` | Base URL of the `wildberries-scraper` service | `http://localhost:8001` |
 
-Marketplace timeout budgets (`easysearch.marketplaces.search-timeout` / `compare-timeout`) are
-tuned generously to accommodate Ozon's antibot-challenge latency — see the comment in
-`application.yaml` before lowering them.
+Marketplace timeout budgets (`easysearch.marketplaces.search-timeout` / `compare-timeout`, 45s/50s)
+are tuned generously to accommodate both Ozon's and Wildberries' antibot-challenge latency — see
+the comment in `application.yaml` before lowering them.
 
 ## Project structure
 
@@ -158,6 +162,7 @@ src/main/java/.../
 ├── web/               controller/, dto/, error/
 └── config/
 ozon-scraper/          Python FastAPI service for Ozon (see its own README.md)
+wildberries-scraper/   Python FastAPI service for Wildberries (see its own README.md)
 ```
 
 ## Testing
@@ -172,14 +177,12 @@ build — no separate commands needed.
 
 ## Known limitations
 
-- **Wildberries and Yandex Market are hardcoded stubs** — they only ever return one canned offer,
-  and only for the exact query `"iphone 15"`. Not real integrations yet.
-- **Ozon has no public search API.** The integration scrapes Ozon's internal page-data API through
-  a Playwright-driven browser session that passes Ozon's antibot challenge. This is inherently
-  fragile — Ozon can change its markup or defenses at any time. See `ozon-scraper/README.md` for
-  what to check if it stops returning results.
-- No production deployment configuration yet (dev-only datasource credentials in
-  `application.yaml`, no Dockerfile for the main app).
+- **Yandex Market is a hardcoded stub** — it only ever returns one canned offer, and only for the
+  exact query `"iphone 15"`. Not a real integration yet.
+- **Neither Ozon nor Wildberries has a public search API.** Both integrations scrape each site's
+  internal API through a browser session that passes that site's antibot challenge — inherently
+  fragile, either site can change its markup or defenses at any time. See each service's own
+  README.md for what to check if it stops returning results.
 
 ## Acknowledgments
 
@@ -188,7 +191,13 @@ challenge once, then call Ozon's internal API via `fetch()` from inside the trus
 adapted from [MaxDev43/Marketplace-Parser](https://github.com/MaxDev43/Marketplace-Parser). A
 first attempt using [Scrapling](https://github.com/D4Vinci/Scrapling)'s browser automation was
 reliably blocked by Ozon's antibot; studying MaxDev43's working implementation is what got the
-integration past it. See `ozon-scraper/README.md` for the full story.
+integration past it.
+
+Wildberries' antibot (WBAAS) needed a different approach — plain Playwright, even stealth-patched,
+was reliably fingerprinted. [`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python)
+(patches Chromium's DevTools-protocol level, not just JS properties), driving a real headful
+Chrome, is what got it past that. See `ozon-scraper/README.md` and `wildberries-scraper/README.md`
+for the full story of each.
 
 ## Contributing
 
