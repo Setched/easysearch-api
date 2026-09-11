@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -45,6 +46,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
         ErrorResponse body = new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Bad Request", e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * Handles requests to a path with no matching route (e.g. a browser visiting {@code /} on this
+     * API-only service) as a plain 404, rather than letting it fall through to the catch-all 500 below.
+     *
+     * @param e the exception Spring raises when no handler (and no static resource) matches
+     * @return a 404 response
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
+        ErrorResponse body = new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Not Found", "No such endpoint");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     /**
