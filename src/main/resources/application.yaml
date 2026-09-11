@@ -28,8 +28,8 @@ easysearch:
     # Wildberries' can take up to ~20s (observed 8-20s live, via a headful patchright/real-Chrome
     # session passing Wildberries' WBAAS antibot — see wildberries-scraper/README.md). These are
     # generous enough to let either finish rather than cutting them off mid-flight. Clients run in
-    # parallel, so fast marketplaces (Yandex Market) aren't slowed down by this — overall latency
-    # is bounded by the slowest client, not the sum.
+    # parallel, so fast marketplaces (Yandex Market — a plain HTTP call, no browser session) aren't
+    # slowed down by this — overall latency is bounded by the slowest client, not the sum.
     search-timeout: 45s
     compare-timeout: 50s
     ozon:
@@ -40,3 +40,7 @@ easysearch:
       base-url: ${WILDBERRIES_SCRAPER_URL:http://localhost:8001}
       connect-timeout: 2s
       read-timeout: 45s
+    yandexmarket:
+      base-url: ${YANDEXMARKET_SCRAPER_URL:http://localhost:8002}
+      connect-timeout: 2s
+      read-timeout: 10s

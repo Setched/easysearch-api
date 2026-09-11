@@ -4,34 +4,48 @@ import me.setched.easysearch.api.domain.model.Marketplace;
 import me.setched.easysearch.api.domain.model.MarketplaceOffer;
 import me.setched.easysearch.api.domain.model.SearchQuery;
 import me.setched.easysearch.api.domain.port.MarketplaceClient;
+import org.springframework.web.client.RestClient;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * {@link MarketplaceClient} stub for Yandex Market.
- * <p>
- * <b>Known limitation:</b> this is a hardcoded placeholder, not a real integration — it only ever returns a
- * single canned offer for the exact query {@code "iphone 15"} and an empty list otherwise. A real HTTP-based
- * (or scraping-based) implementation is still to be built.
+ * {@link MarketplaceClient} adapter for Yandex Market. Yandex Market has no public search API — this calls
+ * the sibling {@code yandexmarket-scraper} service (see {@code yandexmarket-scraper/README.md}), which reads
+ * product data directly out of Yandex Market's public search-results page and returns results in the same
+ * shape this class expects.
  */
 public class YandexMarketMarketplaceClient implements MarketplaceClient {
 
-    private static final String SUPPORTED_QUERY = "iphone 15";
+    private static final String SEARCH_PATH = "/search";
+
+    private final RestClient yandexMarketRestClient;
+
+    /**
+     * Creates a client using the given, already-configured, REST client pointed at the yandexmarket-scraper
+     * service.
+     *
+     * @param yandexMarketRestClient the configured REST client for the yandexmarket-scraper service
+     */
+    public YandexMarketMarketplaceClient(RestClient yandexMarketRestClient) {
+        this.yandexMarketRestClient = yandexMarketRestClient;
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     public List<MarketplaceOffer> search(SearchQuery query) {
-        if (!SUPPORTED_QUERY.equalsIgnoreCase(query.query().trim())) {
+        YandexMarketSearchResponse response = yandexMarketRestClient.get()
+                .uri(uriBuilder -> uriBuilder.path(SEARCH_PATH).queryParam("query", query.query()).build())
+                .retrieve()
+                .body(YandexMarketSearchResponse.class);
+
+        if (response == null || response.items() == null) {
             return List.of();
         }
 
-        return List.of(new MarketplaceOffer(
-                Marketplace.YANDEX_MARKET,
-                "Apple iPhone 15 128GB",
-                new BigDecimal("76990"),
-                "https://market.yandex.ru/product/iphone-15"));
+        return response.items().stream()
+                .map(item -> new MarketplaceOffer(Marketplace.YANDEX_MARKET, item.name(), item.price(), item.url()))
+                .toList();
     }
 }

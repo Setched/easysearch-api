@@ -63,13 +63,15 @@ public class MarketplaceClientsConfig {
     /**
      * The Yandex Market client, wrapped with a timeout.
      *
+     * @param yandexMarketRestClient the configured REST client for Yandex Market
      * @param properties              shared marketplace resilience settings
      * @param marketplaceClientExecutor executor used to enforce the timeout
      * @return the timeout-enforced Yandex Market client
      */
     @Bean
-    public MarketplaceClient yandexMarketMarketplaceClient(MarketplaceClientsProperties properties, ExecutorService marketplaceClientExecutor) {
+    public MarketplaceClient yandexMarketMarketplaceClient(RestClient yandexMarketRestClient, MarketplaceClientsProperties properties,
+                                                             ExecutorService marketplaceClientExecutor) {
         return new TimeoutEnforcingMarketplaceClient(
-                "Yandex Market", new YandexMarketMarketplaceClient(), properties.searchTimeout(), marketplaceClientExecutor);
+                "Yandex Market", new YandexMarketMarketplaceClient(yandexMarketRestClient), properties.searchTimeout(), marketplaceClientExecutor);
     }
 }

@@ -24,6 +24,11 @@ services:
     restart: unless-stopped
     shm_size: "1gb"
 
+  yandexmarket-scraper:
+    build: ./yandexmarket-scraper
+    container_name: easysearch-yandexmarket-scraper
+    restart: unless-stopped
+
   easysearch-api:
     build: .
     container_name: easysearch-api
@@ -32,6 +37,7 @@ services:
       - postgres
       - ozon-scraper
       - wildberries-scraper
+      - yandexmarket-scraper
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -40,6 +46,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       OZON_SCRAPER_URL: http://ozon-scraper:8000
       WILDBERRIES_SCRAPER_URL: http://wildberries-scraper:8001
+      YANDEXMARKET_SCRAPER_URL: http://yandexmarket-scraper:8002
 
   caddy:
     image: caddy:2-alpine
