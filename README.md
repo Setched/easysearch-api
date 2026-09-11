@@ -26,6 +26,7 @@ and returns the cheapest offer, with pagination, sorting, and search history.
 | Build | Maven |
 | Ozon integration | Sibling Python/FastAPI service (`ozon-scraper/`), Playwright-driven |
 | Wildberries integration | Sibling Python/FastAPI service (`wildberries-scraper/`), [`patchright`](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python)-driven headful Chrome |
+| Yandex Market integration | Sibling Python/FastAPI service (`yandexmarket-scraper/`), plain `httpx` — no browser needed |
 | Architecture tests | ArchUnit |
 | Style enforcement | Checkstyle (Javadoc required on every type) |
 
@@ -41,8 +42,10 @@ domain/               Business model + ports (MarketplaceClient, SearchHistoryRe
 application/          Use case orchestration (CompareOffersService)
 infrastructure/       Adapters: marketplace clients, Postgres persistence, resilience decorators
 web/                  REST controller, DTOs, error handling
-ozon-scraper/         Separate Python service — Ozon has no public API, so this scrapes it
-wildberries-scraper/  Separate Python service — same idea, for Wildberries
+ozon-scraper/          Separate Python service — Ozon has no public API, so this scrapes it
+wildberries-scraper/   Separate Python service — same idea, for Wildberries
+yandexmarket-scraper/  Separate Python service — Yandex Market's search page already exposes
+                       product data publicly, so this is a plain HTTP client, no scraping needed
 ```
 
 ## Prerequisites
@@ -77,23 +80,22 @@ wildberries-scraper/  Separate Python service — same idea, for Wildberries
    # {"status":"ok"}
    ```
 
-At this point, Yandex Market will respond (with stub data — see
-[Known limitations](#known-limitations)), but Ozon and Wildberries results will be empty unless
-you also start their scraper services:
+At this point, marketplace results will be empty unless you also start the scraper services:
 
-5. **(Optional) Start the scrapers** — required for real Ozon/Wildberries results
+5. **(Optional) Start the scrapers** — required for real search results
 
    Via Docker (simplest):
    ```bash
-   docker-compose up -d ozon-scraper wildberries-scraper
+   docker-compose up -d ozon-scraper wildberries-scraper yandexmarket-scraper
    ```
 
    Or standalone, for local development/debugging (see each service's own README.md for details):
    ```bash
-   cd ozon-scraper        # or wildberries-scraper
+   cd ozon-scraper        # or wildberries-scraper / yandexmarket-scraper
    pip install -r requirements.txt
    playwright install chromium   # wildberries-scraper: patchright install --with-deps chrome
-   uvicorn app.main:app --reload --port 8000   # wildberries-scraper: --port 8001
+                                  # yandexmarket-scraper: no browser install needed
+   uvicorn app.main:app --reload --port 8000   # wildberries-scraper: --port 8001, yandexmarket-scraper: --port 8002
    ```
 
    > Don't run a service both standalone and via Docker at once — they'd fight over the same
@@ -147,6 +149,7 @@ defaults):
 |---|---|---|
 | `OZON_SCRAPER_URL` | Base URL of the `ozon-scraper` service | `http://localhost:8000` |
 | `WILDBERRIES_SCRAPER_URL` | Base URL of the `wildberries-scraper` service | `http://localhost:8001` |
+| `YANDEXMARKET_SCRAPER_URL` | Base URL of the `yandexmarket-scraper` service | `http://localhost:8002` |
 
 Marketplace timeout budgets (`easysearch.marketplaces.search-timeout` / `compare-timeout`, 45s/50s)
 are tuned generously to accommodate both Ozon's and Wildberries' antibot-challenge latency — see
@@ -163,6 +166,7 @@ src/main/java/.../
 └── config/
 ozon-scraper/          Python FastAPI service for Ozon (see its own README.md)
 wildberries-scraper/   Python FastAPI service for Wildberries (see its own README.md)
+yandexmarket-scraper/  Python FastAPI service for Yandex Market (see its own README.md)
 ```
 
 ## Testing
@@ -177,12 +181,13 @@ build — no separate commands needed.
 
 ## Known limitations
 
-- **Yandex Market is a hardcoded stub** — it only ever returns one canned offer, and only for the
-  exact query `"iphone 15"`. Not a real integration yet.
 - **Neither Ozon nor Wildberries has a public search API.** Both integrations scrape each site's
   internal API through a browser session that passes that site's antibot challenge — inherently
   fragile, either site can change its markup or defenses at any time. See each service's own
   README.md for what to check if it stops returning results.
+- **Yandex Market has no antibot to bypass, but is just as capable of changing its page markup.**
+  `yandexmarket-scraper` reads structured data straight out of the search page's HTML — if Yandex
+  changes that markup, it'll need updating too. See `yandexmarket-scraper/README.md`.
 
 ## Acknowledgments
 
