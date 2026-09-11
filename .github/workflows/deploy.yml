@@ -26,6 +26,12 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
+            # docker compose only pulls/restarts what docker-compose.prod.yml *on the server*
+            # currently says — it has no way to know the file itself changed. Without this pull,
+            # a compose-file change (like the build:->image: switch this deploy flow shipped
+            # with) never reaches the server; docker compose pull silently no-ops for any service
+            # still on an old `build:` line, and up -d just restarts the same stale containers.
+            git pull --ff-only
             export IMAGE_TAG="${{ inputs.image_tag }}"
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
