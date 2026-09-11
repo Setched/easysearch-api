@@ -24,5 +24,11 @@ services:
       - "8001:8001"
     shm_size: "1gb"
 
+  yandexmarket-scraper:
+    build: ./yandexmarket-scraper
+    container_name: easysearch-yandexmarket-scraper
+    ports:
+      - "8002:8002"
+
 volumes:
   easysearch_postgres_data:
