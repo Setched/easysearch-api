@@ -17,6 +17,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,5 +140,17 @@ class SearchControllerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.status").value(500))
                 .andExpect(jsonPath("$.message").value("Something went wrong"));
+    }
+
+    /**
+     * Verifies that a request to a path with no matching route (e.g. a browser visiting {@code /} on
+     * this API-only service) returns a plain 404, not the catch-all 500.
+     */
+    @Test
+    void returnsNotFoundForUnmappedPath() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"));
     }
 }
