@@ -1,0 +1,32 @@
+name: Deploy
+
+# Manually triggered on purpose (not automatic on every push to master) — this is a live
+# production server with no automated DB backups yet, so rolling it out is a deliberate action,
+# not a side effect of merging. See ci.yml's build-and-push job for how images actually get built
+# and published; this workflow only ever pulls and restarts already-published images.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (a commit SHA, or "latest" for the most recent master build)'
+        required: true
+        default: 'latest'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Pull and restart on the server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            export IMAGE_TAG="${{ inputs.image_tag }}"
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
