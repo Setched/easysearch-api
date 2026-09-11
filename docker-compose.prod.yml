@@ -10,8 +10,12 @@ services:
     volumes:
       - easysearch_postgres_data:/var/lib/postgresql/data
 
+  # Images below are built and published by .github/workflows/ci.yml's build-and-push job, not
+  # built here — deploying is "pull + restart" (see .github/workflows/deploy.yml), not a rebuild.
+  # IMAGE_TAG defaults to the latest master build; deploy.yml can pin it to a specific commit SHA
+  # instead, e.g. to roll back.
   ozon-scraper:
-    build: ./ozon-scraper
+    image: ghcr.io/setched/easysearch-api/ozon-scraper:${IMAGE_TAG:-latest}
     container_name: easysearch-ozon-scraper
     restart: unless-stopped
     # Chromium needs more than Docker's default 64MB /dev/shm or the renderer
@@ -19,18 +23,18 @@ services:
     shm_size: "1gb"
 
   wildberries-scraper:
-    build: ./wildberries-scraper
+    image: ghcr.io/setched/easysearch-api/wildberries-scraper:${IMAGE_TAG:-latest}
     container_name: easysearch-wildberries-scraper
     restart: unless-stopped
     shm_size: "1gb"
 
   yandexmarket-scraper:
-    build: ./yandexmarket-scraper
+    image: ghcr.io/setched/easysearch-api/yandexmarket-scraper:${IMAGE_TAG:-latest}
     container_name: easysearch-yandexmarket-scraper
     restart: unless-stopped
 
   easysearch-api:
-    build: .
+    image: ghcr.io/setched/easysearch-api/app:${IMAGE_TAG:-latest}
     container_name: easysearch-api
     restart: unless-stopped
     depends_on:

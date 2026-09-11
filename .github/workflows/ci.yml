@@ -23,3 +23,57 @@ jobs:
 
       - name: Run tests
         run: ./mvnw -B test
+
+  # Builds and publishes every service's Docker image to GHCR so a deploy is just "pull + restart"
+  # on the server, not a build. Runs only after tests pass on master (never on PRs) — publishing an
+  # image per PR would just churn the registry with nothing to deploy them.
+  build-and-push:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: app
+            context: .
+            dockerfile: Dockerfile
+          - image: ozon-scraper
+            context: ozon-scraper
+            dockerfile: ozon-scraper/Dockerfile
+          - image: wildberries-scraper
+            context: wildberries-scraper
+            dockerfile: wildberries-scraper/Dockerfile
+          - image: yandexmarket-scraper
+            context: yandexmarket-scraper
+            dockerfile: yandexmarket-scraper/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Owner/repo hardcoded lowercase — GHCR image paths must be lowercase, and the repository's
+      # actual GitHub casing (Setched/easysearch-api) isn't.
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/setched/easysearch-api/${{ matrix.image }}:latest
+            ghcr.io/setched/easysearch-api/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
