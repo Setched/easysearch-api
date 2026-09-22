@@ -1,19 +1,20 @@
 # easysearch-api
 
-**Status (2026-09-12):** Spring Boot service comparing product prices across Ozon, Wildberries,
+**Status (2026-09-22):** Spring Boot service comparing product prices across Ozon, Wildberries,
 and Yandex Market. **All three are now real, live-verified integrations** — no stubs left. Ozon
 and Wildberries work by bypassing each site's antibot via a scraper; Yandex Market needs no
-antibot bypass at all (see section 3). Deployed and live at `24easysearch.ru`, and deployment is
-now automated: CI builds and publishes Docker images on every merge to `master`, and a manual
-GitHub Actions button (`Deploy` workflow) pulls and restarts them on the server.
+antibot bypass at all (see section 3). Deployed and live at `24easysearch.ru`. Both deployment and
+DB backups are now automated (see section 3) — CI builds and publishes Docker images on every
+merge to `master`, a manual GitHub Actions button (`Deploy` workflow) pulls and restarts them on
+the server, and a separate daily workflow backs up the production DB.
 
 **When starting a session on this project, lead with this snapshot before diving into any task**,
 unless the user's first message already makes their intent clear.
 
-**Recommended next steps:**
-1. Everything in section 4's "deferred" list (response caching, scraper rate-limiting,
-   observability/metrics, test coverage reporting, dependency vuln scanning beyond Dependabot) is
-   still genuinely deferred — no active need for any of it yet, don't build ahead of one.
+**No open next steps right now.** Section 4's "deferred" list (response caching, scraper
+rate-limiting, observability/metrics, test coverage reporting, dependency vuln scanning beyond
+Dependabot) is still genuinely deferred — no active need for any of it yet, don't build ahead of
+one.
 
 Java 21 / Spring Boot 4.1, hexagonal architecture, Postgres for search history. All three
 marketplaces are backed by sibling Python scraper services — see section 3 for why each one needs
@@ -104,12 +105,15 @@ class/interface/enum/record, English only — `mvn test` fails without it.
   service images and publishes them to `ghcr.io/setched/easysearch-api/*` (tagged `:latest` and by
   commit SHA) on every push to `master`. `docker-compose.prod.yml` references those images instead
   of building locally. Actually rolling out to the server is still a deliberate, manual action —
-  `deploy.yml`, triggered via `workflow_dispatch` in the GitHub Actions UI (not automatic on merge)
-  — because there are still no automated DB backups. It SSHes in, runs `git pull --ff-only` (to
+  `deploy.yml`, triggered via `workflow_dispatch` in the GitHub Actions UI (not automatic on
+  merge) — deliberate rollout control, kept manual even now that DB backups exist (see below). It
+  SSHes in, runs `git pull --ff-only` (to
   sync `docker-compose.prod.yml`/`Caddyfile` themselves — `docker compose pull` alone can't detect
   that the compose file changed, learned the hard way on the first real run), then `docker compose
   pull && up -d`. Rollback = re-run with an older commit SHA as the `image_tag` input.
-- **DB backups are automated**, as of 2026-09-20: `.github/workflows/backup-db.yml` runs daily
+- **DB backups are automated**, as of 2026-09-22 (PR #28), live-verified end-to-end (manually
+  triggered, confirmed a valid `.sql.gz` landed on the server): `.github/workflows/backup-db.yml`
+  runs daily
   (cron, plus manual `workflow_dispatch`), reusing the same SSH secrets as `deploy.yml`'s
   `production` environment. It `docker exec`s `pg_dump` on the server, gzips the result into
   `$DEPLOY_PATH/backups/`, and deletes anything older than 14 days. Deliberately local-only, not
@@ -148,4 +152,4 @@ class/interface/enum/record, English only — `mvn test` fails without it.
   the first real deploy run reported success but changed nothing on the server.
 - Lower priority / explicitly deferred: response caching, outbound rate-limiting/backoff for
   scraper calls, observability/metrics, test coverage reporting, dependency vulnerability scanning
-  beyond Dependabot's defaults, automated DB backups.
+  beyond Dependabot's defaults.
