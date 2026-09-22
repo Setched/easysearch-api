@@ -11,10 +11,7 @@ GitHub Actions button (`Deploy` workflow) pulls and restarts them on the server.
 unless the user's first message already makes their intent clear.
 
 **Recommended next steps:**
-1. **Automated DB backups** — only a single manual `pg_dump` exists. Worth doing now that deploys
-   are a one-click action and will likely happen more often — a bad rollout landing without a
-   recent backup is the main remaining risk.
-2. Everything else in section 4's "deferred" list (response caching, scraper rate-limiting,
+1. Everything in section 4's "deferred" list (response caching, scraper rate-limiting,
    observability/metrics, test coverage reporting, dependency vuln scanning beyond Dependabot) is
    still genuinely deferred — no active need for any of it yet, don't build ahead of one.
 
@@ -112,7 +109,13 @@ class/interface/enum/record, English only — `mvn test` fails without it.
   sync `docker-compose.prod.yml`/`Caddyfile` themselves — `docker compose pull` alone can't detect
   that the compose file changed, learned the hard way on the first real run), then `docker compose
   pull && up -d`. Rollback = re-run with an older commit SHA as the `image_tag` input.
-  One manual `pg_dump` backup exists; no automated ones yet (see next-steps snapshot at the top).
+- **DB backups are automated**, as of 2026-09-20: `.github/workflows/backup-db.yml` runs daily
+  (cron, plus manual `workflow_dispatch`), reusing the same SSH secrets as `deploy.yml`'s
+  `production` environment. It `docker exec`s `pg_dump` on the server, gzips the result into
+  `$DEPLOY_PATH/backups/`, and deletes anything older than 14 days. Deliberately local-only, not
+  offsite — `search_history` is low-value data, and the point is recovering from a bad
+  deploy/migration, not surviving VPS loss. Restore: `gunzip -c <file> | docker exec -i
+  easysearch-postgres psql -U easysearch -d easysearch`.
 
 ## 4. Agreements and rules to follow
 

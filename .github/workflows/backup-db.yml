@@ -1,0 +1,30 @@
+name: Backup DB
+
+# Daily pg_dump of the production Postgres, kept locally on the VPS with rotation. Reuses the
+# same SSH secrets as deploy.yml's production environment — no new credentials needed. Local-only
+# on purpose: the data (search history) is low-value, and this exists to protect against a bad
+# deploy/migration, not VPS loss.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Dump and rotate on the server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            BACKUP_DIR="${{ secrets.DEPLOY_PATH }}/backups"
+            mkdir -p "$BACKUP_DIR"
+            docker exec easysearch-postgres pg_dump -U easysearch -d easysearch \
+              | gzip > "$BACKUP_DIR/easysearch-$(date +%F).sql.gz"
+            # Keep 2 weeks of daily backups.
+            find "$BACKUP_DIR" -name 'easysearch-*.sql.gz' -mtime +14 -delete
