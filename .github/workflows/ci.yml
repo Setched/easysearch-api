@@ -67,7 +67,7 @@ jobs:
       # Owner/repo hardcoded lowercase — GHCR image paths must be lowercase, and the repository's
       # actual GitHub casing (Setched/easysearch-api) isn't.
       - name: Build and push ${{ matrix.image }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
